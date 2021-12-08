@@ -3,8 +3,8 @@ import numpy as np
 import cv2
 from tensorflow.keras import Model
 from tensorflow.keras.applications import InceptionV3
-
-from os import listdir
+from tensorflow.keras.layers import Conv2D, MaxPool2D, Flatten, Dropout, Dense
+from tensorflow.keras.metrics import binary_accuracy
 
 
 class Model(tf.keras.Model):
@@ -16,21 +16,60 @@ class Model(tf.keras.Model):
 
         self.batch_size = 100
         self.learning_rate = 0.001
+        self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate)
+        self.pipeline = tf.keras.Sequential()
 
-        self.pipeline = []
-        conv1 = Conv2D(64, 3, 1, padding="same", activation="relu")
-        conv2 = Conv2D(64, 3, 1, padding="same", activation="relu")
-        max1 = MaxPool2D(2)
-        conv3 = Conv2D(128, 3, 1, padding="same", activation="relu")
-        conv4 = Conv2D(128, 3, 1, padding="same", activation="relu")
-        max2 = MaxPool2D(2)
-        conv5 = Conv2D(256, 3, 1, padding="same", activation="relu")
-        conv6 = Conv2D(256, 3, 1, padding="same", activation="relu")
-        max3 = MaxPool2D(2)
-        flat = Flatten()
-        drop = Dropout(0.2)
-        dense1 = Dense(15, activation="softmax")
-        self.architecture = [conv1, conv2, max1, conv3, conv4, max2, conv5, conv6, max3, flat, drop, dense1]
+        self.pipeline.add(Conv2D(64, 3, 1, padding="same", activation="relu"))
+        self.pipeline.add(Conv2D(64, 3, 1, padding="same", activation="relu"))
+        self.pipeline.add(MaxPool2D(2))
+        self.pipeline.add(Conv2D(128, 3, 1, padding="same", activation="relu"))
+        self.pipeline.add(Conv2D(128, 3, 1, padding="same", activation="relu"))
+        self.pipeline.add(MaxPool2D(2))
+        self.pipeline.add(Conv2D(256, 3, 1, padding="same", activation="relu"))
+        self.pipeline.add(Conv2D(256, 3, 1, padding="same", activation="relu"))
+        self.pipeline.add(MaxPool2D(2))
+        self.pipeline.add(Flatten())
+        self.pipeline.add(Dropout(0.2))
+        self.pipeline.add(Dense(2, activation="softmax"))
+        
+        #self.pipeline.compile(loss=tf.keras.losses.binary_crossentropy, optimizer=self.optimizer, metrics=[binary_accuracy])
+
+    # def train(self, inputs, labels, num_epochs):
+    #     result = self.pipeline.fit(inputs, labels, epochs=num_epochs, batch_size=self.batch_size)
+    #     accuracy = sum(result.history['binary_accuracy']) / num_epochs
+    #     loss = sum(result.history['loss']) / num_epochs
+    #     return accuracy, loss
+
+    # def train_step(self, data):
+    #     x, y = data
+    #     # x is shape (batch_size x num_frames x width x height)
+    #     # want to call pipeline on each frame (3d tensor) for each video and average
+    #     # results across frame, then returning this average for each video in batch.
+    #     with tf.GradientTape() as tape:
+    #         y_pred = []
+    #         for i in range(x.shape[0]):
+    #             vid = x[i] # the 3d (num_frames x width x height) video tensor
+    #             preds = self.pipeline(vid) # should be (num_frames x 2) probs tensor
+    #             avg_preds = tf.reduce_mean(preds, axis=0)
+    #             y_pred.append(avg_preds)
+    #         y_pred = tf.Variable(y_pred)
+    #         loss = self.pipeline.compiled_loss(y, y_pred)
+
+    #     gradients = tape.gradients(loss, self.pipeline.trainable_variables)
+    #     self.pipeline.optimizer.apply_gradients(zip(gradients, self.pipeline.trainable_variables))
+    #     self.pipeline.compiled_metrics.update_state(y, y_pred)
+    #     return {m.name: m.result() for m in self.pipeline.metrics}
+
+    # def test(self, inputs, labels):
+    #     result = self.pipeline.evaluate(inputs, labels)
+    #     accuracy = result.history['binary_accuracy']
+    #     loss = result.history['loss']
+    #     return accuracy, loss
+
+    # def predict(self, inputs):
+    #     # FINISH THIS
+    #     result = self.pipeline.predict(inputs)
+    #     pass
 
     def call(self, inputs):
         """
@@ -46,30 +85,28 @@ class Model(tf.keras.Model):
         return inputs
         
 
-    def loss(self, logits, labels):
+    def loss(self, probs, labels):
         """
         Calculates average cross entropy sequence to sequence loss of the prediction
         
         NOTE: You have to use np.reduce_mean and not np.reduce_sum when calculating your loss
 
-        :param logits: a matrix of shape (batch_size, window_size, vocab_size) as a tensor
+        :param probs: a matrix of shape (batch_size, window_size, vocab_size) as a tensor
         :param labels: matrix of shape (batch_size, window_size) containing the labels
         :return: the loss of the model as a tensor of size 1
         """
-
-        #TODO: Fill in
-        #We recommend using tf.keras.losses.sparse_categorical_crossentropy
-        #https://www.tensorflow.org/api_docs/python/tf/keras/losses/sparse_categorical_crossentropy
-        # probs is actually logits
-        loss = tf.keras.losses.binary_crossentropy(labels, logits)
+        #print(labels)
+        print(probs.shape)
+        # logits should be batch_size x 15
+        loss = tf.keras.losses.binary_crossentropy(labels, probs)
         return tf.reduce_mean(loss)
 
-    def accuracy(self, logits, labels):
+    def accuracy(self, probs, labels):
         """
         Calculates the model's prediction accuracy by comparing
         logits to correct labels – no need to modify this.
         
-        :param logits: a matrix of size (num_inputs, self.num_classes); during training, this will be (batch_size, self.num_classes)
+        :param probs: a matrix of size (num_inputs, self.num_classes); during training, this will be (batch_size, self.num_classes)
         containing the result of multiple convolution and feed forward layers
         :param labels: matrix of size (num_labels, self.num_classes) containing the answers, during training, this will be (batch_size, self.num_classes)
 
@@ -77,8 +114,8 @@ class Model(tf.keras.Model):
         
         :return: the accuracy of the model as a Tensor
         """
-        correct_predictions = tf.equal(tf.argmax(logits, 1), tf.argmax(labels, 1))
-        return tf.reduce_mean(tf.cast(correct_predictions, tf.float32))
+        y_pred = tf.argmax(probs, 1)
+        return tf.keras.metrics.binary_accuracy(labels, y_pred)
 
 
 def train(model, train_inputs, train_labels):
@@ -102,9 +139,9 @@ def train(model, train_inputs, train_labels):
         label_batch = train_labels[i:i + model.batch_size]
         # Implement backprop:
         with tf.GradientTape() as tape:
-            logits = model.call(batch) # this calls the call function conveniently
-            loss = model.loss(logits, label_batch)
-            acc = model.accuracy(logits, label_batch)
+            probs = model.call(batch) # this calls the call function conveniently
+            loss = model.loss(probs, label_batch)
+            acc = model.accuracy(probs, label_batch)
             avg_loss += loss
             avg_acc += acc
 
@@ -117,6 +154,9 @@ def train(model, train_inputs, train_labels):
     avg_loss /= num_batches
     avg_acc /= num_batches
     return avg_loss, avg_acc
+
+# def train2(model, train_inputs, train_labels):
+
 
 def test(model, test_inputs, test_labels):
     # fix array indices error
@@ -155,83 +195,10 @@ def load_frames(video_path, max_frames, size):
             break
         #frame = cv2.resize(frame, size)
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        gray = gray.astype('float32')
+        gray /= 255
         #print(gray.shape)
         frames.append(gray)
         if len(frames) == max_frames:
             break
     return np.array(frames)
-
-
-def main():
-    frames_test = load_frames("../balls_sample/ZWFQJX0RJMQB.mp4", 1000, (500, 500))
-    print(frames_test.shape)
-
-    balls_vid_names = listdir("../balls_sample")
-    strikes_vid_names = listdir("../strikes_sample")
-
-    balls_batch = []
-    min_frames = 5000
-    for vid in balls_vid_names:
-        path = "../balls_sample/" + vid
-        frames = load_frames(path, 200, (720, 1280))
-        # print(frames.shape)
-        if frames.shape[0] < min_frames:
-            min_frames = frames.shape[0]
-        balls_batch.append(frames)
-
-    strikes_batch = []
-    for vid in strikes_vid_names:
-        path = "../strikes_sample/" + vid
-        frames = load_frames(path, 200, (720, 1280))
-        # print(frames.shape)
-        if frames.shape[0] < min_frames:
-            min_frames = frames.shape[0]
-        strikes_batch.append(frames)
-
-    # clip videos to be same length (# frames of smallest video in set)
-    for i in range(len(balls_batch)):
-        if balls_batch[i].shape[0] > min_frames:
-            balls_batch[i] = balls_batch[i][:min_frames]
-    balls_batch = np.array(balls_batch)
-    
-    # clip videos to be same length (# frames of smallest video in set)
-    for i in range(len(strikes_batch)):
-        if strikes_batch[i].shape[0] > min_frames:
-            strikes_batch[i] = strikes_batch[i][:min_frames]
-    strikes_batch = np.array(strikes_batch)
-
-    n = len(balls_batch) + len(strikes_batch)
-
-    labels = [] # 0 is ball, 1 is strike
-    for i in range(len(balls_batch)):
-        labels.append(0)
-    for i in range(len(strikes_batch)):
-        labels.append(1)
-
-    labels = tf.Variable(labels)
-    print(labels)
-
-    print(balls_batch.shape)
-    print(strikes_batch.shape)
-    all_inputs = np.concatenate((balls_batch, strikes_batch))
-
-    all_inputs = tf.Variable(all_inputs)
-    print(all_inputs.shape)
-
-    # shuffle inputs
-    indices = tf.Variable(range(len(all_inputs)))
-    shuffled = tf.random.shuffle(indices)
-
-    train_inputs = tf.gather(all_inputs, shuffled)
-    train_labels = tf.gather(labels, shuffled)
-
-    model = Model()
-
-    num_epochs = 1
-    for i in range(num_epochs):
-        loss, acc = train(model, train_inputs, train_labels)
-        print("Epoch: " + i)
-        print("Loss: " + loss + ", Accuracy: " + acc)
-
-if __name__ == '__main__':
-    main()
