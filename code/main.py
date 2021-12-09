@@ -103,7 +103,10 @@ if __name__ == '__main__':
     model = Model(batch_size)
 
     # iteratively grab batches to train
+    numb = 0
+    tot = int(len(train_names) / step_size)
     for i in range(0, len(train_names), step_size):
+        print("Batch " + str(numb) + "/" + str(tot))
         video_batch = train_names[i:i+step_size]
         labels = get_labels(video_batch)
         # print(labels)
@@ -119,6 +122,7 @@ if __name__ == '__main__':
         print(videos.shape)
         print(labels.shape)
         model.train(videos, labels, num_epochs)
+        numb += 1
 
     # iteratively grab batches to test
     for i in range(0, len(test_names), step_size):
