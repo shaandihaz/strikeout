@@ -13,7 +13,7 @@ def load_frames(video_path):
         #print(frame.shape)
         if not ret:
             break
-        #frame = cv2.resize(frame, size)
+        frame = cv2.resize(frame, (360, 640))
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         gray = gray.astype('float32')
         gray /= 255
@@ -23,36 +23,41 @@ def load_frames(video_path):
 
 def load_videos(video_paths):
     video_batch = []
+    good_indices = []
     tot_frames = 0
     i = 0
-    for path in video_paths:
+    for j in range(len(video_paths)):
         print("Loading Video " + str(i))
-        frames = load_frames(path)
+        frames = load_frames(video_paths[j])
         if frames.shape[0] == 0:
             # skip corrupted files
             continue
         # print(frames.shape)
+        good_indices.append(j)
         tot_frames += frames.shape[0]
         video_batch.append(frames)
         i += 1
     avg_frames = int(tot_frames / i)
-    return video_batch, avg_frames
+    return video_batch, avg_frames, good_indices
 
 def normalize_frames(video_batch, avg_frames):
-    for vid in video_batch:
-        numf = vid.shape[0]
+    for i in range(len(video_batch)):
+        #print(vid.shape)
+        numf = video_batch[i].shape[0]
+        #print(numf)
         if numf < avg_frames:
-            pad_frames(vid, avg_frames, (720, 1280))
+            video_batch[i] = pad_frames(video_batch[i], avg_frames, (360, 640))
         elif numf > avg_frames:
-            trim_frames(vid, avg_frames)
+            video_batch[i] = trim_frames(video_batch[i], avg_frames)
+        #print(vid.shape)
 
 def trim_frames(video, min_frames):
     if video.shape[0] > min_frames:
-        video = video[:min_frames]
+        return video[:min_frames]
 
 def pad_frames(video, num_frames, shape):
     numAdd = num_frames - video.shape[0]
-    video = np.pad(video, ((0, numAdd), (0,0), (0,0)))
+    return np.pad(video, ((0, numAdd), (0,0), (0,0)))
 
 def get_labels(video_batch):
     # Get one-hot tensors as label for each video in batch
@@ -85,7 +90,7 @@ if __name__ == '__main__':
     
     # shuffle all names
     random.shuffle(all_vid_names)
-    print(all_vid_names)
+    #print(all_vid_names)
 
     ind = int(len(all_vid_names) * 0.8)
     train_names = all_vid_names[:ind]
@@ -102,12 +107,17 @@ if __name__ == '__main__':
         video_batch = train_names[i:i+step_size]
         labels = get_labels(video_batch)
         # print(labels)
-        videos, avg_frames = load_videos(video_batch)
+        videos, avg_frames, good_indices = load_videos(video_batch)
+        avg_frames = 140
+        labels = tf.gather(labels, good_indices)
+        assert(labels.shape[0] == len(videos))
         print(avg_frames)
         normalize_frames(videos, avg_frames)
-        for v in videos:
-            print(v.shape)
+        # for v in videos:
+        #     print(v.shape)
         videos = np.array(videos)
+        print(videos.shape)
+        print(labels.shape)
         model.train(videos, labels, num_epochs)
 
     # iteratively grab batches to test
@@ -118,8 +128,8 @@ if __name__ == '__main__':
         videos, min_frames = load_videos(video_batch)
         print(min_frames)
         normalize_frames(videos, avg_frames)
-        for v in videos:
-            print(v.shape)
+        # for v in videos:
+        #     print(v.shape)
         videos = np.array(videos)
         model.test(videos, labels)
 
