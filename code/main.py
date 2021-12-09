@@ -23,26 +23,36 @@ def load_frames(video_path):
 
 def load_videos(video_paths):
     video_batch = []
-    min_frames = 5000
-    i = 1
+    tot_frames = 0
+    i = 0
     for path in video_paths:
         print("Loading Video " + str(i))
         frames = load_frames(path)
-        print(frames.shape[0])
         if frames.shape[0] == 0:
             # skip corrupted files
             continue
         # print(frames.shape)
-        if frames.shape[0] < min_frames:
-            min_frames = frames.shape[0]
+        tot_frames += frames.shape[0]
         video_batch.append(frames)
         i += 1
-    return video_batch, min_frames
+    avg_frames = int(tot_frames / i)
+    return video_batch, avg_frames
 
-def trim_frames(video_batch, min_frames):
-    for i in range(len(video_batch)):
-        if video_batch[i].shape[0] > min_frames:
-            video_batch[i] = video_batch[i][:min_frames]
+def normalize_frames(video_batch, avg_frames):
+    for vid in video_batch:
+        numf = vid.shape[0]
+        if numf < avg_frames:
+            pad_frames(vid, avg_frames, (720, 1280))
+        elif numf > avg_frames:
+            trim_frames(vid, avg_frames)
+
+def trim_frames(video, min_frames):
+    if video.shape[0] > min_frames:
+        video = video[:min_frames]
+
+def pad_frames(video, num_frames, shape):
+    numAdd = num_frames - video.shape[0]
+    video = np.pad(video, ((0, numAdd), (0,0), (0,0)))
 
 def get_labels(video_batch):
     # Get one-hot tensors as label for each video in batch
@@ -92,9 +102,9 @@ if __name__ == '__main__':
         video_batch = train_names[i:i+step_size]
         labels = get_labels(video_batch)
         # print(labels)
-        videos, min_frames = load_videos(video_batch)
-        print(min_frames)
-        trim_frames(videos, min_frames)
+        videos, avg_frames = load_videos(video_batch)
+        print(avg_frames)
+        normalize_frames(videos, avg_frames)
         for v in videos:
             print(v.shape)
         videos = np.array(videos)
@@ -107,7 +117,7 @@ if __name__ == '__main__':
         # print(labels)
         videos, min_frames = load_videos(video_batch)
         print(min_frames)
-        trim_frames(videos, min_frames)
+        normalize_frames(videos, avg_frames)
         for v in videos:
             print(v.shape)
         videos = np.array(videos)
