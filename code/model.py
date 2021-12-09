@@ -1,6 +1,5 @@
 import tensorflow as tf
 import numpy as np
-import cv2
 from tensorflow.keras import Model
 from tensorflow.keras.applications import InceptionV3
 from tensorflow.keras.layers import Conv2D, MaxPool2D, Flatten, Dropout, Dense
@@ -8,13 +7,13 @@ from tensorflow.keras.metrics import binary_accuracy
 
 
 class Model(tf.keras.Model):
-    def __init__(self):
+    def __init__(self, batch_size):
         """
         The Model class predicts the outcome of the pitch from the windup clip.
         """
         super(Model, self).__init__()
 
-        self.batch_size = 100
+        self.batch_size = batch_size
         self.learning_rate = 0.001
         self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate)
         self.pipeline = tf.keras.Sequential()
@@ -32,13 +31,13 @@ class Model(tf.keras.Model):
         self.pipeline.add(Dropout(0.2))
         self.pipeline.add(Dense(2, activation="softmax"))
         
-        #self.pipeline.compile(loss=tf.keras.losses.binary_crossentropy, optimizer=self.optimizer, metrics=[binary_accuracy])
+        self.pipeline.compile(loss=tf.keras.losses.binary_crossentropy, optimizer=self.optimizer, metrics=[binary_accuracy])
 
-    # def train(self, inputs, labels, num_epochs):
-    #     result = self.pipeline.fit(inputs, labels, epochs=num_epochs, batch_size=self.batch_size)
-    #     accuracy = sum(result.history['binary_accuracy']) / num_epochs
-    #     loss = sum(result.history['loss']) / num_epochs
-    #     return accuracy, loss
+    def train(self, inputs, labels, num_epochs):
+        result = self.pipeline.fit(inputs, labels, epochs=num_epochs)
+        accuracy = sum(result.history['binary_accuracy']) / num_epochs
+        loss = sum(result.history['loss']) / num_epochs
+        return accuracy, loss
 
     # def train_step(self, data):
     #     x, y = data
@@ -60,145 +59,125 @@ class Model(tf.keras.Model):
     #     self.pipeline.compiled_metrics.update_state(y, y_pred)
     #     return {m.name: m.result() for m in self.pipeline.metrics}
 
-    # def test(self, inputs, labels):
-    #     result = self.pipeline.evaluate(inputs, labels)
-    #     accuracy = result.history['binary_accuracy']
-    #     loss = result.history['loss']
-    #     return accuracy, loss
+    def test(self, inputs, labels):
+        result = self.pipeline.evaluate(inputs, labels)
+        accuracy = result.history['binary_accuracy']
+        loss = result.history['loss']
+        return accuracy, loss
 
-    # def predict(self, inputs):
-    #     # FINISH THIS
-    #     result = self.pipeline.predict(inputs)
-    #     pass
+    def predict(self, inputs):
+        # FINISH THIS
+        result = self.pipeline.predict(inputs)
+        pass
 
-    def call(self, inputs):
-        """
-        :param inputs: word ids of shape (batch_size, window_size)
-        :param initial_state: 2-d array of shape (batch_size, rnn_size) as a tensor
-        :return: dont worry about it
-        """
-        # Take in (batch_size x num_frames x width x height) video clips
-        # and (batch_size x 1) labels
-        # Output (batch_size x 2) probs matrix
-        for layer in self.pipeline:
-            inputs = layer(inputs)
-        return inputs
+    # def call(self, inputs):
+    #     """
+    #     :param inputs: word ids of shape (batch_size, window_size)
+    #     :param initial_state: 2-d array of shape (batch_size, rnn_size) as a tensor
+    #     :return: dont worry about it
+    #     """
+    #     # Take in (batch_size x num_frames x width x height) video clips
+    #     # and (batch_size x 1) labels
+    #     # Output (batch_size x 2) probs matrix
+    #     for layer in self.pipeline:
+    #         inputs = layer(inputs)
+    #     return inputs
         
 
-    def loss(self, probs, labels):
-        """
-        Calculates average cross entropy sequence to sequence loss of the prediction
+    # def loss(self, probs, labels):
+    #     """
+    #     Calculates average cross entropy sequence to sequence loss of the prediction
         
-        NOTE: You have to use np.reduce_mean and not np.reduce_sum when calculating your loss
+    #     NOTE: You have to use np.reduce_mean and not np.reduce_sum when calculating your loss
 
-        :param probs: a matrix of shape (batch_size, window_size, vocab_size) as a tensor
-        :param labels: matrix of shape (batch_size, window_size) containing the labels
-        :return: the loss of the model as a tensor of size 1
-        """
-        #print(labels)
-        print(probs.shape)
-        # logits should be batch_size x 15
-        loss = tf.keras.losses.binary_crossentropy(labels, probs)
-        return tf.reduce_mean(loss)
+    #     :param probs: a matrix of shape (batch_size, window_size, vocab_size) as a tensor
+    #     :param labels: matrix of shape (batch_size, window_size) containing the labels
+    #     :return: the loss of the model as a tensor of size 1
+    #     """
+    #     #print(labels)
+    #     print(probs.shape)
+    #     # logits should be batch_size x 15
+    #     loss = tf.keras.losses.binary_crossentropy(labels, probs)
+    #     return tf.reduce_mean(loss)
 
-    def accuracy(self, probs, labels):
-        """
-        Calculates the model's prediction accuracy by comparing
-        logits to correct labels – no need to modify this.
+    # def accuracy(self, probs, labels):
+    #     """
+    #     Calculates the model's prediction accuracy by comparing
+    #     logits to correct labels – no need to modify this.
         
-        :param probs: a matrix of size (num_inputs, self.num_classes); during training, this will be (batch_size, self.num_classes)
-        containing the result of multiple convolution and feed forward layers
-        :param labels: matrix of size (num_labels, self.num_classes) containing the answers, during training, this will be (batch_size, self.num_classes)
+    #     :param probs: a matrix of size (num_inputs, self.num_classes); during training, this will be (batch_size, self.num_classes)
+    #     containing the result of multiple convolution and feed forward layers
+    #     :param labels: matrix of size (num_labels, self.num_classes) containing the answers, during training, this will be (batch_size, self.num_classes)
 
-        NOTE: DO NOT EDIT
+    #     NOTE: DO NOT EDIT
         
-        :return: the accuracy of the model as a Tensor
-        """
-        y_pred = tf.argmax(probs, 1)
-        return tf.keras.metrics.binary_accuracy(labels, y_pred)
+    #     :return: the accuracy of the model as a Tensor
+    #     """
+    #     y_pred = tf.argmax(probs, 1)
+    #     return tf.keras.metrics.binary_accuracy(labels, y_pred)
 
 
-def train(model, train_inputs, train_labels):
-    """
-    Runs through one epoch - all training examples.
+# def train(model, train_inputs, train_labels):
+#     """
+#     Runs through one epoch - all training examples.
 
-    :param model: the initilized model to use for forward and backward pass
-    :param train_inputs: train inputs (all inputs for training) of shape (num_inputs,)
-    :param train_labels: train labels (all labels for training) of shape (num_labels,)
-    :return: None
-    """
-    # clip train inputs and labels to multiple of window size
+#     :param model: the initilized model to use for forward and backward pass
+#     :param train_inputs: train inputs (all inputs for training) of shape (num_inputs,)
+#     :param train_labels: train labels (all labels for training) of shape (num_labels,)
+#     :return: None
+#     """
+#     # clip train inputs and labels to multiple of window size
 
-    optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
+#     optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
 
-    num_batches = 1
-    avg_loss = 0
-    avg_acc = 0
-    for i in range(0, train_inputs.shape[0], model.batch_size):
-        batch = train_inputs[i:i + model.batch_size]
-        label_batch = train_labels[i:i + model.batch_size]
-        # Implement backprop:
-        with tf.GradientTape() as tape:
-            probs = model.call(batch) # this calls the call function conveniently
-            loss = model.loss(probs, label_batch)
-            acc = model.accuracy(probs, label_batch)
-            avg_loss += loss
-            avg_acc += acc
+#     num_batches = 1
+#     avg_loss = 0
+#     avg_acc = 0
+#     for i in range(0, train_inputs.shape[0], model.batch_size):
+#         batch = train_inputs[i:i + model.batch_size]
+#         label_batch = train_labels[i:i + model.batch_size]
+#         # Implement backprop:
+#         with tf.GradientTape() as tape:
+#             probs = model.call(batch) # this calls the call function conveniently
+#             loss = model.loss(probs, label_batch)
+#             acc = model.accuracy(probs, label_batch)
+#             avg_loss += loss
+#             avg_acc += acc
 
-        # The keras Model class has the computed property trainable_variables to conveniently
-        # return all the trainable variables you'd want to adjust based on the gradients
-        gradients = tape.gradient(loss, model.trainable_variables)
-        optimizer.apply_gradients(zip(gradients, model.trainable_variables))
-        num_batches += 1
+#         # The keras Model class has the computed property trainable_variables to conveniently
+#         # return all the trainable variables you'd want to adjust based on the gradients
+#         gradients = tape.gradient(loss, model.trainable_variables)
+#         optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+#         num_batches += 1
 
-    avg_loss /= num_batches
-    avg_acc /= num_batches
-    return avg_loss, avg_acc
+#     avg_loss /= num_batches
+#     avg_acc /= num_batches
+#     return avg_loss, avg_acc
 
-# def train2(model, train_inputs, train_labels):
+# # def train2(model, train_inputs, train_labels):
 
 
-def test(model, test_inputs, test_labels):
-    # fix array indices error
-    """
-    Runs through one epoch - all testing examples
+# def test(model, test_inputs, test_labels):
+#     # fix array indices error
+#     """
+#     Runs through one epoch - all testing examples
 
-    :param model: the trained model to use for prediction
-    :param test_inputs: train inputs (all inputs for testing) of shape (num_inputs,)
-    :param test_labels: train labels (all labels for testing) of shape (num_labels,)
-    :returns: perplexity of the test set
-    """
-    #NOTE: Ensure a correct perplexity formula (different from raw loss)
-    avg_loss = 0.0
-    num_batches = 0
-    for i in range(0, test_inputs.shape[0], model.batch_size):
-        num_batches += 1
-        batch = test_inputs[i:i + model.batch_size]
-        label_batch = test_labels[i:i + model.batch_size]
-        probs = model.call(batch)
-        # Get the average loss for each row in probs (2d size batch_size x vocab_size)
-        # Add to overall average loss for each batch
-        avg_loss += model.loss(probs, label_batch)
+#     :param model: the trained model to use for prediction
+#     :param test_inputs: train inputs (all inputs for testing) of shape (num_inputs,)
+#     :param test_labels: train labels (all labels for testing) of shape (num_labels,)
+#     :returns: perplexity of the test set
+#     """
+#     #NOTE: Ensure a correct perplexity formula (different from raw loss)
+#     avg_loss = 0.0
+#     num_batches = 0
+#     for i in range(0, test_inputs.shape[0], model.batch_size):
+#         num_batches += 1
+#         batch = test_inputs[i:i + model.batch_size]
+#         label_batch = test_labels[i:i + model.batch_size]
+#         probs = model.call(batch)
+#         # Get the average loss for each row in probs (2d size batch_size x vocab_size)
+#         # Add to overall average loss for each batch
+#         avg_loss += model.loss(probs, label_batch)
     
-    avg_loss = avg_loss / num_batches
-    return avg_loss
-
-    
-
-def load_frames(video_path, max_frames, size):
-    cap = cv2.VideoCapture(video_path)
-    frames = []
-    while True:
-        ret, frame = cap.read()
-        #print(frame.shape)
-        if not ret:
-            break
-        #frame = cv2.resize(frame, size)
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        gray = gray.astype('float32')
-        gray /= 255
-        #print(gray.shape)
-        frames.append(gray)
-        if len(frames) == max_frames:
-            break
-    return np.array(frames)
+#     avg_loss = avg_loss / num_batches
+#     return avg_loss

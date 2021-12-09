@@ -1,0 +1,6 @@
+balls/
+strikes/
+cut_balls/
+cut_strikes/
+*.pyc
+*.DS_Store
