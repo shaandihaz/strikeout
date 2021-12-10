@@ -2,6 +2,7 @@ import tensorflow as tf
 import numpy as np
 import random
 import cv2
+import gc
 from model import Model
 from os import listdir
 import sys
@@ -140,6 +141,7 @@ if __name__ == '__main__':
             train_losses.append(loss)
             train_accs.append(acc)
             numb += 1
+            gc.collect()
         print("Epoch avg loss: " + str(sum(train_losses) / len(train_losses)) + ", avg acc: " + str(sum(train_accs) / len(train_accs)))
 
     print("Train avg loss: " + str(sum(train_losses) / len(train_losses)) + ", avg acc: " + str(sum(train_accs) / len(train_accs)))
