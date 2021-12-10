@@ -1,5 +1,6 @@
 import tensorflow as tf
 import numpy as np
+from matplotlib import pyplot as plt
 from tensorflow.keras import Model
 from tensorflow.keras.applications import InceptionV3
 from tensorflow.keras.layers import Conv2D, MaxPool2D, Flatten, Dropout, Dense
@@ -14,7 +15,7 @@ class Model(tf.keras.Model):
         super(Model, self).__init__()
 
         self.batch_size = batch_size
-        self.learning_rate = 0.001
+        self.learning_rate = 0.01
         self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate)
         self.pipeline = tf.keras.Sequential()
 
@@ -35,8 +36,8 @@ class Model(tf.keras.Model):
 
     def train(self, inputs, labels, num_epochs):
         result = self.pipeline.fit(inputs, labels, epochs=num_epochs)
-        accuracy = sum(result.history['binary_accuracy']) / num_epochs
-        loss = sum(result.history['loss']) / num_epochs
+        accuracy = sum(result.history['binary_accuracy']) / len(result.history['binary_accuracy'])
+        loss = sum(result.history['loss']) / len(result.history['loss'])
         return accuracy, loss
 
     # def train_step(self, data):
@@ -61,14 +62,23 @@ class Model(tf.keras.Model):
 
     def test(self, inputs, labels):
         result = self.pipeline.evaluate(inputs, labels)
-        accuracy = result.history['binary_accuracy']
-        loss = result.history['loss']
+        accuracy = result[1]
+        loss = result[0]
         return accuracy, loss
 
-    def predict(self, inputs):
-        # FINISH THIS
-        result = self.pipeline.predict(inputs)
-        pass
+    def visualize_loss(self, losses): 
+        """
+        Uses Matplotlib to visualize the losses of our model.
+        :param losses: list of loss data stored from train. Can use the model's loss_list 
+        field 
+        :return: doesn't return anything, a plot should pop-up 
+        """
+        x = [i for i in range(len(losses))]
+        plt.plot(x, losses)
+        plt.title('Loss per batch')
+        plt.xlabel('Batch')
+        plt.ylabel('Loss')
+        plt.show()
 
     # def call(self, inputs):
     #     """
